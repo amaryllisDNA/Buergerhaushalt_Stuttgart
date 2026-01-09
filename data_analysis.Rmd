@@ -1,0 +1,49 @@
+---
+title: "Datenanalyse_Buergerhaushalt"
+author: "Anthéa von Borowski"
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## Libraries
+
+```{r libraries}
+
+list.of.packages <- c("ggplot2", "here")
+new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
+if(length(new.packages)) install.packages(new.packages) 
+
+
+for(pkg in list.of.packages){
+  library(pkg, character.only = TRUE)
+}
+
+```
+
+## Datensatz
+
+Die verwendeten Daten wurden in `scraper.ipynb` gesammelt, mithilfe Web-Scraping Methoden.
+
+### Daten importieren
+
+```{r cars}
+
+data <- read.csv(here("dataset", "output.csv"))
+
+
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
