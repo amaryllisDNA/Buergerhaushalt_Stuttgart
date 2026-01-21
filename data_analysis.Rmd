@@ -7,6 +7,8 @@ output: pdf_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+
+rm(list = ls())
 ```
 
 
@@ -14,7 +16,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r libraries}
 
-list.of.packages <- c("ggplot2", "here")
+list.of.packages <- c("ggplot2", "here", "dplyr")
 new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
 if(length(new.packages)) install.packages(new.packages) 
 
@@ -33,17 +35,160 @@ Die verwendeten Daten wurden in `scraper.ipynb` gesammelt, mithilfe Web-Scraping
 
 ```{r cars}
 
-data <- read.csv(here("dataset", "output.csv"))
-
+data <- as.data.frame(read.csv(here("dataset", "output.csv")))
 
 ```
 
-## Including Plots
+### Daten bearbeiten
+
+
+Busse, Bahnen (ÖPNV)
+-Lärm
+Energie, Umwelt
+-Weitere
+Grünflächen, Wald, Friedhöfe
+-Weitere
+Kinder, Jugend, Familie
+-Weitere
+Kultur
+-Weitere
+Schulen, Bildung
+-Weitere
+Sicherheit, Ordnung
+-Weitere
+Sport, Bäder
+-Bäder
+-Weitere
+Stadtplanung, Städtebau
+-Weitere
+Verkehr
+-Lärm
+-Weitere
+
+```{r}
+
+data$status <- gsub("\n", "", data$status)  
+data$status <- trimws(data$status)           
+
+data$kostenneutral <- data$wirkung == "kostenneutral"
+data$sparidee <- data$wirkung == "Sparidee"
+data$ausgabe <- data$wirkung == "Ausgabe"
+data$einnahme <- data$wirkung == "Einnahme"
+```
+
+## Plots
 
 You can also embed plots, for example:
 
 ```{r pressure, echo=FALSE}
-plot(pressure)
+
+grouped_year <- data %>% 
+  group_by(year) %>% 
+  summarise(
+    total = n(),
+    n_wirkung_ausgabe = sum(wirkung == "Ausgabe", na.rm = TRUE)/n(),
+    n_wirkung_neutral = sum(wirkung == "kostenneutral", na.rm = TRUE)/n(),
+    n_wirkung_sparidee = sum(wirkung == "Sparidee", na.rm = TRUE)/n()
+    )
+
+
+grouped_year
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+## Plots
+
+Jetzt generieren wir deskriptive Plots, um die Daten deskriptiv zu visualisieren.
+
+### Anzahl der Angeboten pro Jahr.
+
+```{r plot_anzahl_angebot}
+
+
+ggplot(grouped_year, aes(x = year, y = (total), label = total)) + 
+    geom_line() + 
+    geom_point() + 
+    labs(
+      x = "Jahr",
+      y = "Anzahl der Angeboten",
+      title = "Anzahl der Angeboten bei Bürgerhaushälte zwischen 2013 und 2023"
+    ) +
+  theme_light() +
+  scale_y_continuous(
+    limits = c(0, max(grouped_year$total)),
+    breaks = seq(0, max(grouped_year$total), by = 400)
+  )+
+  scale_x_continuous(breaks= seq(2013, 2023, by = 1))
+```
+
+```{r}
+
+ranks_topics <- data %>%
+  count(year, thema) %>%
+  mutate(
+    percent = n / sum(n) * 100
+  ) %>%
+  group_by(year) %>%
+  arrange(desc(percent), .by_group = TRUE) %>%
+  slice_head(n = 5) %>%
+  ungroup()
+
+
+ggplot(ranks_topics, aes(x = year, y= percent , color = thema)) + 
+  geom_point() + 
+  geom_line() + 
+  labs(
+    x = "Jahr",
+    y = "Anteil (%)",
+    title = "Top 5 Themen pro Jahr",
+    color = "Legend"
+  ) +
+  theme_light() +
+  scale_x_continuous(breaks = seq(2013, 2023, by = 2)) +
+  scale_y_continuous(
+    limits = c(0, max(ranks_topics$percent)),
+    breaks = seq(0, max(ranks_topics$percent), by = 2)
+  )
+``` 
+  
+```{r}
+
+data$reviewed <- data$status != ""
+data$considered <- data$reviewed & ! data$status %in% c("Stadt ist nicht zuständig", "vorher bereits umgesetzt")
+data$refused <- data$status %in% c("Gemeinderat hat abgelehnt", "wird nicht umgesetzt")
+data$accepted <- data$status %in% c("umgesetzt", "wird umgesetzt", "wurde umgesetzt", "Gemeinderat hat teilweise zugestimmt", "Gemeinderat    hat zugestimmt", "bereits teilweise umgesetzt")
+data$pending <- data$status %in% c("ist offen", "wird geprüft", "Gemeinderat entscheidet später", "kein Beschluss gefasst", "")
+
+status_year <- data[!data$pending,] %>% 
+  group_by(year) %>%
+  summarise(
+    n_reviewed = sum(reviewed == T),
+    n_considered = sum(considered == T),
+    n_refused = sum(refused == T),
+    n_accepted = sum(accepted == T),
+    n_pending = sum(pending == T),
+    anteil_reviewed = mean(reviewed == T),
+    anteil_considered = mean(considered == T),
+    anteil_refused = n_refused / n_considered,
+    anteil_accepted = n_accepted/n_considered,
+    anteil_pending = n_pending/n()
+  ) 
+
+
+status_year
+
+sum(data$reviewed)
+
+```
+
+
+```{r}
+
+summary(data[data$considered == T,]$rank)
+summary(data[data$reviewed == T,]$rank)
+
+reg <- glm(reviewed ~ rank + ausgabe + sparidee + einnahme, data = data, family = binomial("logit"))
+
+exp(reg$coefficients)
+summary(reg)
+```
+
