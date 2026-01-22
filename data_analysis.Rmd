@@ -42,29 +42,6 @@ data <- as.data.frame(read.csv(here("dataset", "output.csv")))
 ### Daten bearbeiten
 
 
-Busse, Bahnen (ÖPNV)
--Lärm
-Energie, Umwelt
--Weitere
-Grünflächen, Wald, Friedhöfe
--Weitere
-Kinder, Jugend, Familie
--Weitere
-Kultur
--Weitere
-Schulen, Bildung
--Weitere
-Sicherheit, Ordnung
--Weitere
-Sport, Bäder
--Bäder
--Weitere
-Stadtplanung, Städtebau
--Weitere
-Verkehr
--Lärm
--Weitere
-
 ```{r}
 
 data$status <- gsub("\n", "", data$status)  
