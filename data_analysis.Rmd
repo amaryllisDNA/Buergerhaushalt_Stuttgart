@@ -16,7 +16,7 @@ rm(list = ls())
 
 ```{r libraries}
 
-list.of.packages <- c("ggplot2", "here", "dplyr")
+list.of.packages <- c("ggplot2", "here", "dplyr", "randomcoloR")
 new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
 if(length(new.packages)) install.packages(new.packages) 
 
@@ -57,33 +57,31 @@ data$einnahme <- data$wirkung == "Einnahme"
 
 You can also embed plots, for example:
 
+
 ```{r pressure, echo=FALSE}
 
 grouped_year <- data %>% 
   group_by(year) %>% 
   summarise(
     total = n(),
-    n_wirkung_ausgabe = sum(wirkung == "Ausgabe", na.rm = TRUE)/n(),
-    n_wirkung_neutral = sum(wirkung == "kostenneutral", na.rm = TRUE)/n(),
-    n_wirkung_sparidee = sum(wirkung == "Sparidee", na.rm = TRUE)/n()
+    n_wirkung_ausgabe = sum(wirkung == "Ausgabe", na.rm = TRUE) ,
+    n_wirkung_neutral = sum(wirkung == "kostenneutral", na.rm = TRUE) ,
+    n_wirkung_sparidee = sum(wirkung == "Sparidee", na.rm = TRUE) ,
+    n_wirkung_einnahme = sum(wirkung == "Einnahme", na.rm = TRUE) ,
+    
     )
 
 
 grouped_year
 ```
 
-## Plots
+```{r plots grouped_year}
 
-Jetzt generieren wir deskriptive Plots, um die Daten deskriptiv zu visualisieren.
-
-### Anzahl der Angeboten pro Jahr.
-
-```{r plot_anzahl_angebot}
+par(mfrow = c(2,2))
 
 
-ggplot(grouped_year, aes(x = year, y = (total), label = total)) + 
-    geom_line() + 
-    geom_point() + 
+ggplot(grouped_year, aes(x = year)) + 
+    geom_bar(stat = "identity") + 
     labs(
       x = "Jahr",
       y = "Anzahl der Angeboten",
@@ -95,38 +93,52 @@ ggplot(grouped_year, aes(x = year, y = (total), label = total)) +
     breaks = seq(0, max(grouped_year$total), by = 400)
   )+
   scale_x_continuous(breaks= seq(2013, 2023, by = 1))
+
+
+
 ```
 
-```{r}
+## Plots
 
-ranks_topics <- data %>%
-  count(year, thema) %>%
-  mutate(
-    percent = n / sum(n) * 100
-  ) %>%
-  group_by(year) %>%
-  arrange(desc(percent), .by_group = TRUE) %>%
-  slice_head(n = 5) %>%
-  ungroup()
+Jetzt generieren wir deskriptive Plots, um die Daten deskriptiv zu visualisieren.
 
+### Anzahl der Angeboten pro Jahr.
 
-ggplot(ranks_topics, aes(x = year, y= percent , color = thema)) + 
-  geom_point() + 
-  geom_line() + 
-  labs(
-    x = "Jahr",
-    y = "Anteil (%)",
-    title = "Top 5 Themen pro Jahr",
-    color = "Legend"
-  ) +
+```{r plot_anzahl_angebot}
+
+par(mfrow = c(2,2))
+
+ggplot(grouped_year, aes(x = year)) + 
+    geom_bar(aes(y= n_wirkung_einnahme + n_wirkung_sparidee + n_wirkung_neutral + n_wirkung_ausgabe , fill = "Ausgabe"), stat="identity") +
+    geom_bar(aes(y= n_wirkung_einnahme + n_wirkung_sparidee + n_wirkung_neutral, fill = "Kostenneutral"), stat = "identity") +
+    geom_bar(aes(y= n_wirkung_einnahme + n_wirkung_sparidee, fill = "Sparidee"), stat = "identity") +
+    geom_bar(aes(y= n_wirkung_einnahme, fill = "Einnahme"), stat = "identity") +
+    labs(
+      x = "Jahr",
+      y = "Anzahl der Angeboten",
+      title = "Anzahl der Angeboten bei Bürgerhaushälte zwischen 2011 und 2023 und derer Wirkung auf den Haushault",
+      fill = "Legende"
+    ) +
   theme_light() +
-  scale_x_continuous(breaks = seq(2013, 2023, by = 2)) +
+  scale_fill_manual(
+    breaks = c("Ausgabe", "Kostenneutral", "Sparidee", "Einnahme"),
+    values = c(
+      "Ausgabe"       = "gray85",
+      "Kostenneutral" = "gray65",
+      "Sparidee"      = "gray45",
+      "Einnahme"      = "gray25"
+    ) )+
   scale_y_continuous(
-    limits = c(0, max(ranks_topics$percent)),
-    breaks = seq(0, max(ranks_topics$percent), by = 2)
-  )
-``` 
-  
+    limits = c(0, max(grouped_year$total)),
+    breaks = seq(0, max(grouped_year$total), by = 400)
+  )+
+  scale_x_continuous(breaks= seq(2011, 2023, by = 2))
+
+
+
+
+```
+
 ```{r}
 
 data$reviewed <- data$status != ""
@@ -138,6 +150,7 @@ data$pending <- data$status %in% c("ist offen", "wird geprüft", "Gemeinderat en
 status_year <- data[!data$pending,] %>% 
   group_by(year) %>%
   summarise(
+    total = n(),
     n_reviewed = sum(reviewed == T),
     n_considered = sum(considered == T),
     n_refused = sum(refused == T),
@@ -152,10 +165,85 @@ status_year <- data[!data$pending,] %>%
 
 
 status_year
+```
 
-sum(data$reviewed)
+
+
+
+```{r}
+
+ranks_topics_all <- data %>%
+  count(year, topic) %>%
+  mutate(
+    status = "all",
+    percent = n / sum(n) * 100
+  ) %>%
+  group_by(year) %>%
+  arrange(desc(percent), .by_group = TRUE) %>%
+  filter(!topic %in% c("-1", "Zusätzliche Themen")) %>%
+  slice_head(n = 3) %>%
+  ungroup()
+
+ranks_topics_accepted <- data[data$accepted == TRUE,] %>%
+  count(year, topic) %>%
+  mutate(
+    status = "accepted",
+    percent = n / sum(n) * 100
+  ) %>%
+  group_by(year) %>%
+  arrange(desc(percent), .by_group = TRUE) %>%
+  filter(!topic %in% c("-1", "Zusätzliche Themen")) %>%
+  slice_head(n = 3) %>%
+  ungroup()
+
+ranks_topics_refused <- data[data$refused == TRUE,] %>%
+  count(year, topic) %>%
+  mutate(
+    status = "refused",
+    percent = n / sum(n) * 100
+  ) %>%
+  group_by(year) %>%
+  arrange(desc(percent), .by_group = TRUE) %>%
+  filter(!topic %in% c("-1", "Zusätzliche Themen")) %>%
+  slice_head(n = 3) %>%
+  ungroup()
+
+
+ranks_topics <- rbind(ranks_topics_all, ranks_topics_refused, ranks_topics_accepted)
+
+ranks_topics <- ranks_topics %>% sort_by(ranks_topics$year)
+ranks_topics$topic <- factor(ranks_topics$topic)
+
+ranks_topics
+``` 
+
+```{r plot_status}
+
+topic_palette <- c(
+  "#A6CEE3",  # light blue
+  "#FDBF6F",  # light orange
+  "#B2DF8A",  # light green
+  "#FB9A99",  # light red
+  "#CAB2D6",  # light purple
+  "#E0C1A0",  # light brown
+  "#8DD3C7",  # light teal
+  "#D9D9D9",  # light gray
+  "#FFFFB3",  # light yellow
+  "#CCEBC5",  # light mint
+  "#FCCDE5",  # light pink
+  "#E5D8BD"   # light beige
+)
+
+
+
+ggplot(ranks_topics, aes(x= factor(year), y = percent, fill = topic)) +
+  geom_col(position = "stack") +
+  facet_grid(status ~ ., scales = "fixed") +
+  theme_light() +
+  scale_fill_hue()
 
 ```
+  
 
 
 ```{r}
@@ -168,4 +256,8 @@ reg <- glm(reviewed ~ rank + ausgabe + sparidee + einnahme, data = data, family 
 exp(reg$coefficients)
 summary(reg)
 ```
+
+## Referenzen
+Marina Neunecker - Partizipation trifft Repräsentation
+Schneider - Bürgerhaushalte (VS Springer)
 
